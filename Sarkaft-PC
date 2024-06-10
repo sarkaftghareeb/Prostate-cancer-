@@ -1,0 +1,228 @@
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.feature_selection import SelectKBest, f_classif
+from keras.models import Sequential
+from keras.layers import Dense, Conv1D, Flatten
+from keras.optimizers import Adam
+from sklearn.neural_network import MLPClassifier
+from sklearn.model_selection import GridSearchCV
+
+df = pd.read_excel('TUMOR.xlsx')
+df.info()
+df.tail()
+print("Original column names:")
+print(df.columns)
+import pandas as pd
+
+# Load the uploaded Excel file
+file_path = 'C:/Users/BAWER CENTER/sarkaft/TUMOR.xlsx'
+data = pd.read_excel(file_path)
+
+# Transpose the dataframe
+transposed_data = df.transpose()
+
+
+transposed_data.tail()
+column_data = transposed_data.iloc[:, 21330]
+
+# Print the data from column 21330
+print(column_data)
+column_data = transposed_data.iloc[:, 21328]
+print(column_data)
+
+threshold = transposed_data.loc['21328'].median()   ###21328=212022_s_at
+
+# Load the dataset
+
+target = transposed_data.iloc[:, 21328]  # Assuming column 21328 is the probe-set ID "21328"
+
+# Binarize the target based on a predefined threshold, here using the median as an example
+threshold = target.median()
+transposed_data['target'] = (target >= threshold).astype(int)
+
+# Prepare features and target variable
+X = transposed_data.drop(columns=['target'])
+y = transposed_data['target']
+
+# Split the data into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+print(X_train.describe())  # This will give you a summary and can help in identifying any NaN or infinite values.
+
+# Feature scaling
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+# Feature selection for top 20 genes
+selector = SelectKBest(score_func=f_classif, k=20)
+X_train_selected = selector.fit_transform(X_train_scaled, y_train)
+
+# Get the selected feature indices
+selected_indices = selector.get_support(indices=True)
+selected_gene_ids = X.columns[selected_indices]
+
+print("Top 20 related genes:", selected_gene_ids)
+####### next part
+
+#  data preparation and feature selection have been done
+# X_train_scaled, X_test_scaled, y_train, y_test as obtained from previous steps
+
+# Logistic Regression
+logreg = LogisticRegression()
+logreg.fit(X_train_scaled, y_train)
+logreg_pred = logreg.predict(X_test_scaled)
+logreg_acc = accuracy_score(y_test, logreg_pred)
+logreg_auc = roc_auc_score(y_test, logreg.predict_proba(X_test_scaled)[:, 1])
+
+# Simple Neural Network
+mlp = MLPClassifier(hidden_layer_sizes=(100,), max_iter=500, alpha=1e-4,
+                    solver='sgd', verbose=10, random_state=1,
+                    learning_rate_init=.1)
+mlp.fit(X_train_scaled, y_train)
+mlp_pred = mlp.predict(X_test_scaled)
+mlp_acc = accuracy_score(y_test, mlp_pred)
+mlp_auc = roc_auc_score(y_test, mlp.predict_proba(X_test_scaled)[:, 1])
+
+# Setting up a simple CNN (not typical for tabular data)
+model = Sequential()
+model.add(Conv1D(filters=64, kernel_size=3, activation='relu', input_shape=(X_train_scaled.shape[1], 1)))
+model.add(Flatten())
+model.add(Dense(50, activation='relu'))
+model.add(Dense(1, activation='sigmoid'))
+model.compile(optimizer=Adam(), loss='binary_crossentropy', metrics=['accuracy'])
+
+# Reshape data for CNN
+X_train_cnn = X_train_scaled.reshape(X_train_scaled.shape[0], X_train_scaled.shape[1], 1)
+X_test_cnn = X_test_scaled.reshape(X_test_scaled.shape[0], X_test_scaled.shape[1], 1)
+
+# Fit CNN
+model.fit(X_train_cnn, y_train, epochs=50, verbose=1)
+cnn_pred = (model.predict(X_test_cnn) > 0.5).astype("int32")
+cnn_acc = accuracy_score(y_test, cnn_pred)
+cnn_auc = roc_auc_score(y_test, model.predict(X_test_cnn))
+
+# Print model performances
+print(f"Logistic Regression - Accuracy: {logreg_acc}, AUC: {logreg_auc}")
+print(f"MLP Classifier - Accuracy: {mlp_acc}, AUC: {mlp_auc}")
+print(f"CNN - Accuracy: {cnn_acc}, AUC: {cnn_auc}")
+
+## step 2optimaztion 
+from sklearn.model_selection import GridSearchCV
+
+# Define the model
+logreg = LogisticRegression()
+
+# Define the parameter grid
+param_grid = {
+    'C': [0.001, 0.01, 0.1, 1, 10],  # Regularization strength
+    'solver': ['lbfgs', 'liblinear']  # Algorithm to use in the optimization problem
+}
+
+# Setup the grid search
+grid_search = GridSearchCV(estimator=logreg, param_grid=param_grid, cv=5, scoring='roc_auc')
+
+# Perform the grid search on the training data
+grid_search.fit(X_train_scaled, y_train)
+
+# Best parameters found
+print("Best parameters found:")
+print(grid_search.best_params_)
+
+# Best score achieved
+print("Best ROC-AUC score:")
+print(grid_search.best_score_)
+####figure 
+from sklearn.model_selection import GridSearchCV
+
+# Define the model
+logreg = LogisticRegression()
+
+# Define the parameter grid
+param_grid = {
+    'C': [0.001, 0.01, 0.1, 1, 10],  # Regularization strength
+    'solver': ['lbfgs', 'liblinear']  # Algorithm to use in the optimization problem
+}
+
+# Setup the grid search
+grid_search = GridSearchCV(estimator=logreg, param_grid=param_grid, cv=5, scoring='roc_auc')
+
+# Perform the grid search on the training data
+grid_search.fit(X_train_scaled, y_train)
+
+# Best parameters found
+print("Best parameters found:")
+print(grid_search.best_params_)
+
+# Best score achieved
+print("Best ROC-AUC score:")
+print(grid_search.best_score_)
+###
+
+
+# Define the model
+logreg = LogisticRegression()
+
+# Define the parameter grid
+param_grid = {
+    'C': [0.001, 0.01, 0.1, 1, 10],  # Regularization strength
+    'solver': ['lbfgs', 'liblinear']  # Algorithm to use in the optimization problem
+}
+
+# Setup the grid search
+grid_search = GridSearchCV(estimator=logreg, param_grid=param_grid, cv=5, scoring='roc_auc')
+
+# Perform the grid search on the training data
+grid_search.fit(X_train_scaled, y_train)
+
+# Best parameters found
+print("Best parameters found:")
+print(grid_search.best_params_)
+
+# Best score achieved
+print("Best ROC-AUC score:")
+print(grid_search.best_score_)
+#####figure
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Example predictions from logistic regression, MLP, and CNN models
+# Assuming logreg_pred, mlp_pred, cnn_pred, and their respective probability outputs are defined
+# Also assuming the accuracy and ROC-AUC scores have been calculated as in the previous script
+
+# Calculate accuracy and ROC-AUC for Logistic Regression
+logreg_accuracy = accuracy_score(y_test, logreg_pred)
+logreg_roc_auc = roc_auc_score(y_test, logreg.predict_proba(X_test_scaled)[:, 1])
+
+# Calculate accuracy and ROC-AUC for MLP
+mlp_accuracy = accuracy_score(y_test, mlp_pred)
+mlp_roc_auc = roc_auc_score(y_test, mlp.predict_proba(X_test_scaled)[:, 1])
+
+# Calculate accuracy and ROC-AUC for CNN
+cnn_accuracy = accuracy_score(y_test, cnn_pred)
+cnn_roc_auc = roc_auc_score(y_test, cnn_pred_probs)
+
+# Collect metrics
+model_names = ['Logistic Regression', 'MLP Classifier', 'CNN']
+accuracies = [logreg_accuracy, mlp_accuracy]
+roc_aucs = [logreg_roc_auc, mlp_roc_auc]
+
+# Plotting the accuracies
+plt.figure(figsize=(10, 5))
+
+plt.subplot(1, 2, 1)
+plt.barh(model_names, accuracies, color='skyblue')
+plt.xlabel('Accuracy')
+plt.title('Model Accuracies')
+
+# Plotting the ROC-AUC scores
+plt.subplot(1, 2, 2)
+plt.barh(model_names, roc_aucs, color='salmon')
+plt.xlabel('ROC-AUC')
+plt.title('Model ROC-AUC Scores')
+
+plt.tight_layout()
+plt.show()
